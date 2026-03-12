@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>오늘의 환율</title>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Noto+Sans+KR:wght@300;400;700&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #0a0a0f; --card: #12121a; --accent: #c8f535;
+      --text: #f0f0f0; --muted: #555570; --border: #1e1e2e;
+    }
+    body { background: var(--bg); color: var(--text); font-family: 'Noto Sans KR', sans-serif; min-height: 100vh; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+    body::before { content: ''; position: fixed; inset: 0; background-image: linear-gradient(rgba(200,245,53,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(200,245,53,0.03) 1px, transparent 1px); background-size: 40px 40px; pointer-events: none; }
+    .container { width: 380px; padding: 20px; }
+    .header { margin-bottom: 32px; }
+    .label { font-size: 11px; letter-spacing: 4px; color: var(--accent); text-transform: uppercase; margin-bottom: 6px; }
+    .title { font-family: 'Bebas Neue', sans-serif; font-size: 52px; line-height: 1; letter-spacing: 2px; color: var(--text); }
+    .title span { color: var(--accent); }
+    .card { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 32px; position: relative; overflow: hidden; }
+    .card::before { content: '$'; position: absolute; right: -10px; top: -20px; font-family: 'Bebas Neue', sans-serif; font-size: 160px; color: rgba(200,245,53,0.04); pointer-events: none; line-height: 1; }
+    .flag-row { display: flex; align-items: center; gap: 10px; margin-bottom: 20px; }
+    .flag { font-size: 28px; }
+    .currency-name { font-size: 13px; color: var(--muted); letter-spacing: 1px; }
+    .currency-name strong { display: block; font-size: 16px; color: var(--text); font-weight: 700; letter-spacing: 0; }
+    .rate-display { margin: 8px 0 24px; min-height: 80px; display: flex; align-items: flex-end; gap: 8px; }
+    .rate-number { font-family: 'Bebas Neue', sans-serif; font-size: 72px; line-height: 1; color: var(--accent); letter-spacing: 1px; transition: all 0.4s ease; }
+    .rate-unit { font-size: 16px; color: var(--muted); padding-bottom: 12px; font-weight: 300; }
+    .placeholder-text { font-size: 18px; color: var(--muted); font-weight: 300; padding-bottom: 8px; }
+    .btn { width: 100%; padding: 16px; background: var(--accent); color: #0a0a0f; border: none; border-radius: 10px; font-family: 'Noto Sans KR', sans-serif; font-size: 15px; font-weight: 700; cursor: pointer; letter-spacing: 1px; transition: all 0.2s ease; }
+    .btn:hover { background: #d8ff50; transform: translateY(-1px); box-shadow: 0 8px 24px rgba(200,245,53,0.25); }
+    .btn:active { transform: translateY(0); }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+    .spinner { display: inline-block; width: 16px; height: 16px; border: 2px solid rgba(0,0,0,0.3); border-top-color: #000; border-radius: 50%; animation: spin 0.7s linear infinite; vertical-align: middle; margin-right: 8px; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .update-time { margin-top: 14px; font-size: 11px; color: var(--muted); text-align: center; letter-spacing: 1px; min-height: 16px; }
+    .error-msg { margin-top: 12px; font-size: 12px; color: #ff6b6b; text-align: center; }
+    @keyframes fadeUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    .animate-in { animation: fadeUp 0.4s ease forwards; }
+    .footer { margin-top: 20px; text-align: center; font-size: 10px; color: var(--muted); letter-spacing: 1px; }
+  </style>
+</head>
+<body>
+<div class="container">
+  <div class="header">
+    <div class="label">실시간 외환 정보</div>
+    <div class="title">오늘의<br><span>환율</span></div>
+  </div>
+  <div class="card">
+    <div class="flag-row">
+      <span class="flag">🇺🇸</span>
+      <div class="currency-name">
+        <strong>USD / KRW</strong>
+        미국 달러 → 한국 원
+      </div>
+    </div>
+    <div class="rate-display" id="rateDisplay">
+      <span class="placeholder-text" id="placeholder">버튼을 눌러 조회하세요</span>
+      <span class="rate-number" id="rateNumber" style="display:none"></span>
+      <span class="rate-unit" id="rateUnit" style="display:none">원</span>
+    </div>
+    <button class="btn" id="fetchBtn" onclick="fetchRate()">🔍 환율 조회하기</button>
+    <div class="update-time" id="updateTime"></div>
+    <div class="error-msg" id="errorMsg"></div>
+  </div>
+  <div class="footer">DATA · exchangerate-api.com · 무료 API 기준</div>
+</div>
+<script>
+  async function fetchRate() {
+    const btn = document.getElementById('fetchBtn');
+    const rateNumber = document.getElementById('rateNumber');
+    const rateUnit = document.getElementById('rateUnit');
+    const placeholder = document.getElementById('placeholder');
+    const updateTime = document.getElementById('updateTime');
+    const errorMsg = document.getElementById('errorMsg');
+    errorMsg.textContent = '';
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span> 불러오는 중...';
+    try {
+      const res = await fetch('https://open.er-api.com/v6/latest/USD');
+      const data = await res.json();
+      if (data.result !== 'success') throw new Error('데이터 오류');
+      const rate = data.rates['KRW'];
+      const formatted = Math.round(rate).toLocaleString('ko-KR');
+      placeholder.style.display = 'none';
+      rateNumber.style.display = 'inline';
+      rateUnit.style.display = 'inline';
+      rateNumber.textContent = formatted;
+      rateNumber.classList.remove('animate-in');
+      void rateNumber.offsetWidth;
+      rateNumber.classList.add('animate-in');
+      const now = new Date();
+      const timeStr = now.toLocaleString('ko-KR', { month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+      updateTime.textContent = `마지막 업데이트: ${timeStr}`;
+      btn.innerHTML = '✅ 다시 조회하기';
+    } catch (e) {
+      errorMsg.textContent = '⚠️ 환율 정보를 불러오지 못했어요. 인터넷 연결을 확인해주세요.';
+      btn.innerHTML = '🔍 환율 조회하기';
+    } finally {
+      btn.disabled = false;
+    }
+  }
+</script>
+</body>
+</html>
